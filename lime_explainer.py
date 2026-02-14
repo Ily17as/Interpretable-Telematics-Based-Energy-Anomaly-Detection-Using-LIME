@@ -29,8 +29,6 @@ class LimeExplainer:
         """
         self.feature_names = feature_names
         self.random_state = random_state
-        if random_state is not None:
-            np.random.seed(random_state)
     
     def generate_neighborhood(self, instance, num_samples=5000, std_dev=0.1):
         """
@@ -52,8 +50,11 @@ class LimeExplainer:
         """
         num_features = len(instance)
         
+        # Use local random state if provided
+        rng = np.random.RandomState(self.random_state) if self.random_state is not None else np.random
+        
         # Generate random perturbations using normal distribution
-        perturbations = np.random.normal(0, std_dev, size=(num_samples, num_features))
+        perturbations = rng.normal(0, std_dev, size=(num_samples, num_features))
         
         # Create perturbed samples by adding perturbations to the instance
         perturbed_samples = instance + perturbations * np.std(instance)

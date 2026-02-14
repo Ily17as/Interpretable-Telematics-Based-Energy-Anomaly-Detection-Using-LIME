@@ -56,8 +56,12 @@ class LimeExplainer:
         # Generate random perturbations using normal distribution
         perturbations = rng.normal(0, std_dev, size=(num_samples, num_features))
         
-        # Create perturbed samples by adding perturbations to the instance
-        perturbed_samples = instance + perturbations * np.std(instance)
+        # Compute per-feature standard deviation for appropriate scaling
+        # Use small epsilon to avoid division by zero
+        feature_std = np.abs(instance) + 1e-6
+        
+        # Create perturbed samples by adding scaled perturbations to the instance
+        perturbed_samples = instance + perturbations * feature_std
         
         return perturbed_samples
     
@@ -199,13 +203,38 @@ class LimeExplainer:
         # Compute weights
         weights = self.compute_weights(instance, perturbed_samples, kernel_width)
         
-        # Get explanation
-        explanation = self.explain_instance(
-            instance, predict_fn, num_samples, num_features, kernel_width, std_dev
-        )
+        # Fit weighted linear model (same as in explain_instance)
+        linear_model = Ridge(alpha=1.0, fit_intercept=True)
+        linear_model.fit(perturbed_samples, predictions, sample_weight=weights)
         
-        explanation['perturbed_samples'] = perturbed_samples
-        explanation['predictions'] = predictions
-        explanation['weights'] = weights
+        # Get feature importances (coefficients of linear model)
+        coefficients = linear_model.coef_
+        
+        # Sort features by absolute coefficient value
+        feature_importance = [(i, coeff) for i, coeff in enumerate(coefficients)]
+        feature_importance.sort(key=lambda x: abs(x[1]), reverse=True)
+        
+        # Take top num_features
+        top_features = feature_importance[:num_features]
+        
+        # Compute R² score on the perturbed samples
+        local_predictions = linear_model.predict(perturbed_samples)
+        ss_res = np.sum(weights * (predictions - local_predictions) ** 2)
+        ss_tot = np.sum(weights * (predictions - np.average(predictions, weights=weights)) ** 2)
+        r2_score = 1 - (ss_res / ss_tot) if ss_tot != 0 else 0
+        
+        # Get local prediction for the instance
+        local_pred = linear_model.predict(instance.reshape(1, -1))[0]
+        
+        explanation = {
+            'feature_weights': top_features,
+            'feature_names': self.feature_names,
+            'intercept': linear_model.intercept_,
+            'r2_score': r2_score,
+            'local_pred': local_pred,
+            'perturbed_samples': perturbed_samples,
+            'predictions': predictions,
+            'weights': weights
+        }
         
         return explanation

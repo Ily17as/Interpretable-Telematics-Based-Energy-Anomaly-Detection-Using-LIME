@@ -26,9 +26,6 @@ Given vehicle telematics data, we:
 -   Train a regression model to predict expected energy consumption.
 -   Compute residuals:
 
-```{=html}
-<!-- -->
-```
     residual = actual_energy - predicted_energy
 
 -   Detect anomalous trips using residual thresholds.

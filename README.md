@@ -1,165 +1,176 @@
-# Interpretable Telematics-Based Energy Anomaly Detection (LIME + XGBoost)
+# Interpretable Telematics-Based Energy Anomaly Detection using LIME
 
-Explainable anomaly detection for **vehicle energy consumption** using:
+## Overview
 
-- **XGBoost regression** to predict *expected (normal) energy consumption per km*
-- **Residual-based anomaly detection**: `residual = actual_energy - predicted_energy`
-- **LIME (from scratch)** for local, human-interpretable explanations of suspicious trips
+This project implements an interpretable machine learning pipeline for
+detecting anomalous vehicle trips based on telematics-derived energy
+consumption.
 
-> Course project (proposal date: 2026-02-12)
+The system consists of:
 
----
+1.  **Energy Consumption Regression Model (XGBoost)**
+2.  **Residual-based Anomaly Detection**
+3.  **Local Explanations using LIME**
+4.  **Visualization and CLI tools for analysis**
 
-## Problem
+The primary objective is not only to detect abnormal trips, but also to
+provide **human-interpretable explanations** describing why a trip is
+considered anomalous.
 
-Modern vehicles generate large volumes of **OBD + GPS telematics**, but drivers usually can’t interpret early signs of vehicle degradation.
+------------------------------------------------------------------------
 
-This project detects **abnormal energy consumption patterns** and explains *why* a trip looks suspicious, improving transparency and user trust.
+## Problem Statement
 
----
+Given vehicle telematics data, we:
 
-## Dataset
+-   Train a regression model to predict expected energy consumption.
+-   Compute residuals:
 
-**Vehicle Energy Dataset (VED)**
-
-- Real-world OBD and GPS telematics
-- 383 vehicles
-- ~600k km of driving data
-- Multivariate time-series (e.g., speed, acceleration, energy consumption)
-
----
-
-## Method Overview
-
-### 1) ML model (black-box)
-
-**Model:** Gradient Boosting (**XGBoost**) for regression.
-
-**Target:** expected energy consumption per km.
-
-**Features (aggregated per trip):**
-- mean/variance of speed
-- acceleration statistics
-- stop-and-go ratio
-- idle time
-- time-of-day / seasonality
-
-### 2) Anomaly definition
-
-We flag trips with unusually high residual:
-
-```text
-residual = actual_energy - predicted_energy
+```{=html}
+<!-- -->
 ```
+    residual = actual_energy - predicted_energy
 
-High residual → unexplained excess energy use → potential vehicle issue.
+-   Detect anomalous trips using residual thresholds.
+-   Generate local explanations using LIME to identify which features
+    contribute most to the anomaly.
 
-### 3) Explainability (LIME)
+------------------------------------------------------------------------
 
-We implement **LIME** for tabular trip features to explain *local behavior* of the XGBoost model around each anomalous trip.
+## Repository Structure
 
-**Core objective (LIME):**
+    regression_model/
+        ved-energy-regression.ipynb
+        models/
+        outputs/
 
-\[
-\hat{g} = \arg\min_{g \in G} \sum_{i=1}^{N} \pi_x(z_i)\,(f(z_i) - g(z_i))^2 + \Omega(g)
-\]
+    src/
+        anomaly/
+        cli/
+        utils/
+        viz/
+        xai/
 
-Where:
-- `f` is the black-box model (XGBoost)
-- `g` is a simple local surrogate (linear model)
-- `z_i` are perturbed samples around the selected trip `x`
-- `π_x(z_i)` is locality weighting
-- `Ω(g)` is a complexity penalty (encourages simplicity)
+### regression_model/
 
----
+Contains model training artifacts: - XGBoost energy regressor - Saved
+model artifacts (`.joblib`) - Residual tables (`.parquet`)
 
-## Deliverables
+### src/
 
-- Reproducible Python code (this repo)
-- Trained anomaly detection model (XGBoost + residual thresholding)
-- 3–5 LIME explanation case studies
-- Visualizations:
-  - predicted vs actual energy
-  - LIME local feature importance per anomaly
-- Validation with regression metrics: **MAE / RMSE**
-- Technical write-up / blog-style report
+Core production-style pipeline.
 
----
+-   `anomaly/` --- threshold logic and anomaly generation
+-   `cli/` --- command line interfaces
+-   `utils/` --- I/O and schema definitions
+-   `viz/` --- visualization utilities
+-   `xai/` --- LIME implementation components:
+    -   perturbation
+    -   kernel weighting
+    -   surrogate modeling
+    -   fidelity evaluation
 
-## Repository Structure (suggested)
+------------------------------------------------------------------------
 
-```text
-.
-├── data/                      # (optional) dataset pointers / processed samples (avoid uploading raw VED if restricted)
-├── notebooks/
-│   ├── 01_eda.ipynb
-│   ├── 02_train_xgboost.ipynb
-│   └── 03_lime_explanations.ipynb
-├── src/
-│   ├── features.py            # trip aggregation and feature engineering
-│   ├── model.py               # XGBoost training + evaluation
-│   ├── anomaly.py             # residual computation + thresholding
-│   ├── lime_from_scratch.py   # LIME implementation
-│   └── viz.py                 # plots (pred vs actual, feature importances)
-├── reports/                   # figures / short write-up (optional)
-├── requirements.txt
-└── README.md
-```
+## Installation
 
----
+Create a virtual environment and install dependencies:
 
-## Quickstart
-
-### 1) Create environment
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+``` bash
+python -m venv venv
+source venv/bin/activate   # or venv\Scripts\activate on Windows
 pip install -r requirements.txt
 ```
 
-### 2) Run pipeline (recommended order)
+------------------------------------------------------------------------
 
-1. **Feature engineering** (aggregate trip-level features)
-2. **Train XGBoost** (predict expected energy)
-3. **Compute residuals** + select anomalies
-4. **Run LIME** on selected anomalies
-5. **Generate plots** and save explanation examples
+## Training the Energy Model
 
----
+Open:
 
-## Evaluation
+    regression_model/ved-energy-regression.ipynb
 
-### Regression
-- MAE
-- RMSE
+This notebook:
 
-### Explanation artifacts
-- For each anomalous trip:
-  - top positive contributors (features increasing predicted energy)
-  - top negative contributors (features decreasing predicted energy)
-  - confidence/quality diagnostics (optional)
+-   Loads and preprocesses telematics data
+-   Performs feature engineering
+-   Splits data by vehicle ID (no leakage)
+-   Trains XGBoost regressor
+-   Saves:
+    -   trained model
+    -   residuals table
 
----
+------------------------------------------------------------------------
 
-## Timeline (from proposal)
+## Detecting Anomalies
 
-- 2026-02-12 — Proposal submission
-- 2026-03-12 — Base implementation (ML model + anomaly detection)
-- 2026-04-15 — Visualizations and testing (LIME)
-- 2026-04-21 — Final presentation
+Example CLI usage:
 
----
+``` bash
+python -m src.cli.detect_anomalies --input residuals.parquet
+```
 
-## Notes
+An anomaly is defined via configurable residual thresholding.
 
-- If VED licensing restricts redistribution, store only **data preparation scripts** and provide instructions for obtaining the dataset.
-- Keep all experiments **reproducible**: fixed random seeds, documented environment, and consistent preprocessing.
+------------------------------------------------------------------------
 
----
+## Explaining a Trip
 
-## Authors
+``` bash
+python -m src.cli.explain_trip --trip_id <ID>
+```
 
-- Ilyas Galiev  
-- Daria Alexandrova  
-- Kamilya Shakirova  
+This will:
+
+1.  Generate perturbed samples around the trip
+2.  Query the black-box XGBoost model
+3.  Fit a local linear surrogate
+4.  Output feature importance explanation
+
+------------------------------------------------------------------------
+
+## XAI Methodology
+
+We implement a tabular variant of **LIME**:
+
+-   Local sampling around a target trip
+-   Kernel-based proximity weighting
+-   Linear surrogate fit
+-   Feature attribution extraction
+
+Fidelity metrics are computed to assess explanation reliability.
+
+------------------------------------------------------------------------
+
+## Research Contribution
+
+This project demonstrates:
+
+-   Residual-based anomaly detection for telematics
+-   Practical LIME implementation from scratch
+-   End-to-end interpretable ML workflow
+-   CLI integration for reproducibility
+
+------------------------------------------------------------------------
+
+## Reproducibility
+
+To reproduce results:
+
+1.  Install dependencies
+2.  Train the regression model
+3.  Generate residuals
+4.  Run anomaly detection
+5.  Generate explanations
+
+------------------------------------------------------------------------
+
+## Requirements
+
+See `requirements.txt`
+
+------------------------------------------------------------------------
+
+## License
+
+MIT License

@@ -1,173 +1,129 @@
-# Interpretable Telematics-Based Energy Anomaly Detection using LIME
+# Interpretable Telematics-Based Energy Anomaly Detection with LIME
 
-## Overview
+## What this repository does
 
-This project implements an interpretable machine learning pipeline for
-detecting anomalous vehicle trips based on telematics-derived energy
-consumption.
+This project studies **energy anomaly detection for vehicle trips** and explains suspicious predictions with **LIME**.
 
-The system consists of:
+The core pipeline is:
 
-1.  **Energy Consumption Regression Model (XGBoost)**
-2.  **Residual-based Anomaly Detection**
-3.  **Local Explanations using LIME**
-4.  **Visualization and CLI tools for analysis**
+1. build a trip-level table from the Vehicle Energy Dataset (VED)
+2. train an **XGBoost regressor** to predict expected energy consumption per km
+3. define anomalies as trips with unusually large positive residuals
+4. explain anomalous trips with **local linear surrogates** around each trip
 
-The primary objective is not only to detect abnormal trips, but also to
-provide **human-interpretable explanations** describing why a trip is
-considered anomalous.
+## Why this version is stronger
 
-------------------------------------------------------------------------
+The previous repository mixed together two different artifact formats and the explanation CLI could not be reproduced from the files that were committed. This refactored version makes the workflow explicit:
 
-## Problem Statement
+- `regression_model/` stores baseline artifacts
+- `LIME_implementation/final_telematics_lime_project.ipynb` is the full research notebook
+- `src/` contains a cleaner, modular pipeline for anomaly detection and explanation
+- `docs/` contains a polished proposal and a baseline report template
+- `tests/` contains small smoke tests for the main mathematical components
 
-Given vehicle telematics data, we:
+## Research question
 
--   Train a regression model to predict expected energy consumption.
--   Compute residuals:
+**Can we detect trips with unexpectedly high energy consumption and provide locally faithful, human-readable explanations of which telematics factors made those trips look anomalous?**
 
-    residual = actual_energy - predicted_energy
+This formulation is stronger than “use LIME on XGBoost” because it defines:
 
--   Detect anomalous trips using residual thresholds.
--   Generate local explanations using LIME to identify which features
-    contribute most to the anomaly.
+- the prediction target
+- the anomaly criterion
+- the explainability objective
+- the evaluation target for the final report
 
-------------------------------------------------------------------------
+## Repository structure
 
-## Repository Structure
+```text
+LIME_implementation/
+  final_telematics_lime_project.ipynb   # full end-to-end notebook
+  README_run_xai_project.md
 
-    regression_model/
-        ved-energy-regression.ipynb
-        models/
-        outputs/
+regression_model/
+  ved-energy-regression.ipynb           # baseline model notebook
+  models/
+  outputs/
 
-    src/
-        anomaly/
-        cli/
-        utils/
-        viz/
-        xai/
+src/
+  anomaly/                             # threshold logic
+  cli/                                 # command line entry points
+  modeling/                            # raw-feature to design-matrix helpers
+  utils/                               # I/O and artifact loading
+  viz/                                 # plotting
+  xai/                                 # LIME utilities
 
-### regression_model/
+docs/
+  IMPROVED_PROPOSAL.md
+  BASELINE_REPORT_TEMPLATE.md
+  TA_CHECKLIST.md
 
-Contains model training artifacts: - XGBoost energy regressor - Saved
-model artifacts (`.joblib`) - Residual tables (`.parquet`)
+tests/
+  test_thresholds.py
+  test_weighted_ridge.py
+```
 
-### src/
+## Important reproducibility note
 
-Core production-style pipeline.
+There are **two artifact styles** in this repository:
 
--   `anomaly/` --- threshold logic and anomaly generation
--   `cli/` --- command line interfaces
--   `utils/` --- I/O and schema definitions
--   `viz/` --- visualization utilities
--   `xai/` --- LIME implementation components:
-    -   perturbation
-    -   kernel weighting
-    -   surrogate modeling
-    -   fidelity evaluation
+1. **baseline regression artifact**
+   - saved in `regression_model/models/xgb_energy_regressor.joblib`
+   - contains a dictionary with the trained model and the design columns
+2. **full XAI artifact**
+   - produced by `LIME_implementation/final_telematics_lime_project.ipynb`
+   - contains raw-feature metadata, preprocessing info, background samples, and model metrics
 
-------------------------------------------------------------------------
+For trip-level explanations, the recommended path is the **full XAI artifact**, because LIME needs the raw trip features and a background distribution.
 
 ## Installation
 
-Create a virtual environment and install dependencies:
-
-``` bash
-python -m venv venv
-source venv/bin/activate   # or venv\Scripts\activate on Windows
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-------------------------------------------------------------------------
+## Baseline anomaly detection
 
-## Training the Energy Model
-
-Open:
-
-    regression_model/ved-energy-regression.ipynb
-
-This notebook:
-
--   Loads and preprocesses telematics data
--   Performs feature engineering
--   Splits data by vehicle ID (no leakage)
--   Trains XGBoost regressor
--   Saves:
-    -   trained model
-    -   residuals table
-
-------------------------------------------------------------------------
-
-## Detecting Anomalies
-
-Example CLI usage:
-
-``` bash
-python -m src.cli.detect_anomalies --input residuals.parquet
+```bash
+python -m src.cli.detect_anomalies   --residuals_path regression_model/outputs/residuals.parquet   --out_anomalies_path outputs/anomalies.parquet   --out_meta_path outputs/anomaly_config.json
 ```
 
-An anomaly is defined via configurable residual thresholding.
+## Trip explanation (recommended workflow)
 
-------------------------------------------------------------------------
+First run the full notebook and produce:
 
-## Explaining a Trip
+- `outputs_final/cache/trip_table_scored.csv.gz`
+- `outputs_final/models/xgb_energy_artifact.joblib`
 
-``` bash
-python -m src.cli.explain_trip --trip_id <ID>
+Then explain a trip:
+
+```bash
+python -m src.cli.explain_trip   --scored_table_path outputs_final/cache/trip_table_scored.csv.gz   --artifact_path outputs_final/models/xgb_energy_artifact.joblib   --trip_id 8_706   --out_dir outputs/explanations
 ```
 
-This will:
+## Why the final report should be convincing
 
-1.  Generate perturbed samples around the trip
-2.  Query the black-box XGBoost model
-3.  Fit a local linear surrogate
-4.  Output feature importance explanation
+A good final submission should clearly separate four questions:
 
-------------------------------------------------------------------------
+1. **Prediction quality** — how well does XGBoost estimate expected energy consumption?
+2. **Anomaly logic** — why is a residual-based anomaly definition reasonable here?
+3. **Explanation quality** — how locally faithful is the surrogate? (local R², local RMSE)
+4. **Practical usefulness** — do the explanations point to understandable trip factors such as speed variance, idling, distance, acceleration, and vehicle properties?
 
-## XAI Methodology
+## Known limitations
 
-We implement a tabular variant of **LIME**:
+- residual-based anomaly detection can confuse true faults with unusual but benign driving conditions
+- LIME explanations are local and can vary with perturbation settings
+- explanations are only as good as the feature engineering used upstream
+- the repository does not ship the full raw VED dataset, so users must recreate the scored trip table from the notebook
 
--   Local sampling around a target trip
--   Kernel-based proximity weighting
--   Linear surrogate fit
--   Feature attribution extraction
+## References to cite in the report
 
-Fidelity metrics are computed to assess explanation reliability.
-
-------------------------------------------------------------------------
-
-## Research Contribution
-
-This project demonstrates:
-
--   Residual-based anomaly detection for telematics
--   Practical LIME implementation from scratch
--   End-to-end interpretable ML workflow
--   CLI integration for reproducibility
-
-------------------------------------------------------------------------
-
-## Reproducibility
-
-To reproduce results:
-
-1.  Install dependencies
-2.  Train the regression model
-3.  Generate residuals
-4.  Run anomaly detection
-5.  Generate explanations
-
-------------------------------------------------------------------------
-
-## Requirements
-
-See `requirements.txt`
-
-------------------------------------------------------------------------
+1. Ribeiro, Singh, Guestrin. *“Why Should I Trust You?”: Explaining the Predictions of Any Classifier.* KDD 2016.
+2. Oh, LeBlanc, Peng. *Vehicle Energy Dataset (VED), A Large-scale Dataset for Vehicle Energy Consumption Research.* arXiv:1905.02081.
+3. Chen, Guestrin. *XGBoost: A Scalable Tree Boosting System.* KDD 2016.
 
 ## License
 
-MIT License
+MIT

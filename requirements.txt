@@ -1,6 +1,7 @@
-pandas
 numpy
+pandas
 joblib
 matplotlib
 scikit-learn
 xgboost
+pyarrow

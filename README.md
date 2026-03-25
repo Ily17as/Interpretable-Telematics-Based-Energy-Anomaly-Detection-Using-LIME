@@ -1,79 +1,190 @@
 # Interpretable Telematics-Based Energy Anomaly Detection with LIME
 
-## What this repository does
+This repository studies **trip-level vehicle energy anomaly detection** and explains suspicious predictions with **LIME-style local surrogate models**.
 
-This project studies **energy anomaly detection for vehicle trips** and explains suspicious predictions with **LIME**.
+The core workflow is:
 
-The core pipeline is:
+1. build a trip-level table from the Vehicle Energy Dataset (VED);
+2. train an **XGBoost regressor** to predict expected `energy_per_km`;
+3. define anomalies as trips with unusually large positive residuals;
+4. explain anomalous trips with local linear surrogates around each trip.
 
-1. build a trip-level table from the Vehicle Energy Dataset (VED)
-2. train an **XGBoost regressor** to predict expected energy consumption per km
-3. define anomalies as trips with unusually large positive residuals
-4. explain anomalous trips with **local linear surrogates** around each trip
+---
 
-## Why this version is stronger
+## Dataset
 
-The previous repository mixed together two different artifact formats and the explanation CLI could not be reproduced from the files that were committed. This refactored version makes the workflow explicit:
+The project was built and tested with the Kaggle-hosted version of VED:
 
-- `regression_model/` stores baseline artifacts
-- `LIME_implementation/final_telematics_lime_project.ipynb` is the full research notebook
-- `src/` contains a cleaner, modular pipeline for anomaly detection and explanation
-- `docs/` contains a polished proposal and a baseline report template
-- `tests/` contains small smoke tests for the main mathematical components
+**Kaggle dataset:** <https://www.kaggle.com/datasets/galievilyas/ved-dataset/data>
 
-## Research question
+This is the dataset version you should attach when running the notebooks in Kaggle.
 
-**Can we detect trips with unexpectedly high energy consumption and provide locally faithful, human-readable explanations of which telematics factors made those trips look anomalous?**
+---
 
-This formulation is stronger than “use LIME on XGBoost” because it defines:
+## Recommended execution environment
 
-- the prediction target
-- the anomaly criterion
-- the explainability objective
-- the evaluation target for the final report
+### Why Kaggle is recommended
+
+Although parts of the project can be used locally, the **recommended runtime is Kaggle Notebook environment**.
+
+Why:
+
+- the dataset is already hosted on Kaggle;
+- the main notebooks were developed and executed in a Kaggle-style workflow;
+- the exported artifacts in the repository match that workflow;
+- it is the simplest way to reproduce the baseline end-to-end without path and storage issues.
+
+### Practical recommendation
+
+> **Run the main notebooks in Kaggle first.**  
+> Use the local repository as the structured code, report, and packaging view of the project.
+
+---
 
 ## Repository structure
 
 ```text
-LIME_implementation/
-  final_telematics_lime_project.ipynb   # full end-to-end notebook
-  README_run_xai_project.md
-
-regression_model/
-  ved-energy-regression.ipynb           # baseline model notebook
-  models/
-  outputs/
-
-src/
-  anomaly/                             # threshold logic
-  cli/                                 # command line entry points
-  modeling/                            # raw-feature to design-matrix helpers
-  utils/                               # I/O and artifact loading
-  viz/                                 # plotting
-  xai/                                 # LIME utilities
-
-docs/
-  IMPROVED_PROPOSAL.md
-  BASELINE_REPORT_TEMPLATE.md
-  TA_CHECKLIST.md
-
-tests/
-  test_thresholds.py
-  test_weighted_ridge.py
+Interpretable-Telematics-Based-Energy-Anomaly-Detection-Using-LIME-main/
+├── LIME_implementation/
+│   ├── final-telematics-lime.ipynb
+│   └── output.zip
+├── regression_model/
+│   ├── ved-energy-regression.ipynb
+│   ├── models/
+│   │   ├── xgb_energy_artifact.joblib
+│   │   └── xgb_energy_regressor.joblib
+│   └── outputs/
+│       └── residuals.parquet
+├── src/
+│   ├── anomaly/
+│   ├── cli/
+│   ├── modeling/
+│   ├── utils/
+│   ├── viz/
+│   └── xai/
+├── tests/
+│   ├── test_explain_trip_cli.py
+│   ├── test_thresholds.py
+│   └── test_weighted_ridge.py
+├── README.md
+├── requirements.txt
+└── XAI_Course_Project_Proposal.pdf
 ```
 
-## Important reproducibility note
+---
 
-There are **two artifact styles** in this repository:
+## What is already implemented
 
-1. **baseline regression artifact**
-   - saved in `regression_model/models/xgb_energy_regressor.joblib`
-   - contains a dictionary with the trained model and the design columns
-2. **full XAI artifact**
-   - produced by `LIME_implementation/final_telematics_lime_project.ipynb`
-   - contains raw-feature metadata, preprocessing info, background samples, and model metrics
+The repository already contains:
 
-For trip-level explanations, the recommended path is the **full XAI artifact**, because LIME needs the raw trip features and a background distribution.
+- a baseline regression workflow for trip-level energy prediction;
+- a full end-to-end notebook for anomaly detection and local explanation;
+- saved model artifacts;
+- saved scored trip tables;
+- saved tuning tables for XGBoost and LIME;
+- saved explanation summaries, JSON files, and bar plots;
+- a modular `src/` package for anomaly logic, artifact loading, plotting, and LIME utilities;
+- smoke tests for thresholding, surrogate fitting, and CLI behavior.
+
+---
+
+## Where the main logic currently lives
+
+The project is still primarily **notebook-driven**.
+
+Measured from the current repository:
+
+- there are **2 main notebooks**;
+- together they contain roughly **1847 lines of code**;
+- the modular `src/` package contains roughly **1327 lines of Python code** (excluding tests);
+- therefore, about **58%** of the notebook + `src/` implementation lives in notebooks.
+
+So the current situation is:
+
+- **notebooks = main research workflow**;
+- **`src/` = support layer for reproducibility, CLI usage, and cleaner packaging**.
+
+This is important for anyone grading or reusing the repository: the best way to understand the full project is still to start with the notebooks.
+
+---
+
+## Main notebooks
+
+### 1. `regression_model/ved-energy-regression.ipynb`
+
+Purpose:
+
+- builds the baseline trip-level energy regressor;
+- trains and evaluates the XGBoost model;
+- exports prediction artifacts.
+
+### 2. `LIME_implementation/final-telematics-lime.ipynb`
+
+Purpose:
+
+- runs the end-to-end anomaly + explanation workflow;
+- scores trips with the trained model;
+- identifies anomalous trips;
+- tunes LIME settings;
+- generates local explanation outputs.
+
+If you only want the full baseline workflow, this second notebook is the most important one.
+
+---
+
+## Modular `src/` package
+
+The `src/` package contains a cleaner implementation of reusable parts of the pipeline.
+
+### `src/anomaly/`
+Residual thresholding and anomaly-table generation.
+
+### `src/cli/`
+Command-line entry points such as anomaly detection and trip explanation.
+
+### `src/modeling/`
+Helpers for design-matrix construction and feature alignment.
+
+### `src/utils/`
+Artifact loading, I/O helpers, and schema utilities.
+
+### `src/viz/`
+Plotting utilities for reporting and inspection.
+
+### `src/xai/`
+LIME-related utilities: perturbation, kernel weighting, surrogate fitting, and fidelity metrics.
+
+---
+
+## Current shipped artifacts
+
+The repository and shipped output package already include artifacts that demonstrate a working baseline:
+
+- `outputs_final/cache/trip_table_scored.csv.gz`;
+- `outputs_final/cache/xgb_tuning_results.csv`;
+- `outputs_final/cache/lime_tuning_results.csv`;
+- `outputs_final/models/xgb_energy_artifact.joblib`;
+- `outputs_final/lime_explanations/lime_explanation_summary.csv`;
+- explanation JSON files and bar plots for multiple anomalous trips.
+
+These are enough to show that the project is already beyond the proposal stage.
+
+---
+
+## Current baseline status
+
+From the current shipped artifacts:
+
+- total trips: **3249**;
+- split sizes: **1957 train / 594 val / 698 test**;
+- current test metrics from shipped scored table: **MAE 0.0670 / RMSE 0.1332 / R² 0.5377**;
+- flagged test anomalies: **41** out of **698** test trips (**5.87%**);
+- generated explanation cases: **4**;
+- mean local explanation fidelity in shipped summary: **local R² ≈ 0.7970**.
+
+These numbers describe the **current repository outputs as shipped**, not an idealized future version.
+
+---
 
 ## Installation
 
@@ -83,46 +194,61 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Baseline anomaly detection
+---
 
-```bash
-python -m src.cli.detect_anomalies   --residuals_path regression_model/outputs/residuals.parquet   --out_anomalies_path outputs/anomalies.parquet   --out_meta_path outputs/anomaly_config.json
-```
+## Recommended workflow
 
-## Trip explanation (recommended workflow)
+### Option A — recommended: run in Kaggle
 
-First run the full notebook and produce:
+1. Open a Kaggle notebook.
+2. Attach the dataset: `galievilyas/ved-dataset`.
+3. Upload or clone the repository.
+4. Run:
+   - `regression_model/ved-energy-regression.ipynb`
+   - then `LIME_implementation/final-telematics-lime.ipynb`
+5. Export outputs if needed.
 
-- `outputs_final/cache/trip_table_scored.csv.gz`
-- `outputs_final/models/xgb_energy_artifact.joblib`
+### Option B — local inspection / partial reuse
 
-Then explain a trip:
+Use the repository locally to:
 
-```bash
-python -m src.cli.explain_trip   --scored_table_path outputs_final/cache/trip_table_scored.csv.gz   --artifact_path outputs_final/models/xgb_energy_artifact.joblib   --trip_id 8_706   --out_dir outputs/explanations
-```
+- inspect the notebooks;
+- reuse the modular `src/` code;
+- read the reports and artifacts;
+- run smoke tests.
 
-## Why the final report should be convincing
+This is convenient for development, but it is **not the primary recommended path** for first reproduction.
 
-A good final submission should clearly separate four questions:
+---
 
-1. **Prediction quality** — how well does XGBoost estimate expected energy consumption?
-2. **Anomaly logic** — why is a residual-based anomaly definition reasonable here?
-3. **Explanation quality** — how locally faithful is the surrogate? (local R², local RMSE)
-4. **Practical usefulness** — do the explanations point to understandable trip factors such as speed variance, idling, distance, acceleration, and vehicle properties?
+## Why this repository is structured this way
 
-## Known limitations
+This project evolved from exploratory research notebooks into a more structured repository. Because of that, the repository currently has **two complementary forms**:
 
-- residual-based anomaly detection can confuse true faults with unusual but benign driving conditions
-- LIME explanations are local and can vary with perturbation settings
-- explanations are only as good as the feature engineering used upstream
-- the repository does not ship the full raw VED dataset, so users must recreate the scored trip table from the notebook
+1. **notebook form** — where the main experimental logic lives;
+2. **package form** — where reusable anomaly/XAI utilities are collected.
 
-## References to cite in the report
+This hybrid structure is useful for a course project because it preserves the original experimental workflow while also improving readability and reproducibility.
 
-1. Ribeiro, Singh, Guestrin. *“Why Should I Trust You?”: Explaining the Predictions of Any Classifier.* KDD 2016.
-2. Oh, LeBlanc, Peng. *Vehicle Energy Dataset (VED), A Large-scale Dataset for Vehicle Energy Consumption Research.* arXiv:1905.02081.
-3. Chen, Guestrin. *XGBoost: A Scalable Tree Boosting System.* KDD 2016.
+---
+
+## Limitations
+
+- the workflow is still primarily notebook-centric;
+- residual anomalies are not direct fault labels;
+- LIME explanations are local and can vary with perturbation settings;
+- trip aggregation loses sequence information;
+- some exogenous factors may still be missing.
+
+---
+
+## References
+
+1. Ribeiro, M. T., Singh, S., & Guestrin, C. (2016). **“Why Should I Trust You?”: Explaining the Predictions of Any Classifier.** KDD 2016.  
+2. Oh, G. S., LeBlanc, D. J., & Peng, H. (2019). **Vehicle Energy Dataset (VED), A Large-scale Dataset for Vehicle Energy Consumption Research.** arXiv:1905.02081.  
+3. Chen, T., & Guestrin, C. (2016). **XGBoost: A Scalable Tree Boosting System.** KDD 2016.
+
+---
 
 ## License
 

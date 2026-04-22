@@ -1,0 +1,13 @@
+feature,contribution
+accel_var,-0.015075010969303549
+Transmission_CVT,-0.012583739566616714
+Transmission_NO DATA,-0.0036172224674373863
+Generalized_Weight,-0.003575227316468954
+distance_km,-0.0017892805626615882
+duration_min,0.0001664018025621772
+idle_time_min,-4.0747039020061496e-05
+VehicleType_PHEV,0.0
+Drive Wheels_FWD,0.0
+VehicleType_EV,0.0
+Drive Wheels_NO DATA,0.0
+Vehicle Class_NO DATA,0.0

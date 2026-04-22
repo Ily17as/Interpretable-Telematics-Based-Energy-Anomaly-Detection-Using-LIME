@@ -1,0 +1,11 @@
+feature,contribution
+Generalized_Weight,0.01122976612909214
+speed_mean,-0.0010615945330467898
+distance_km,0.0004766551616093649
+duration_min,0.00010676403747072597
+Drive Wheels_FWD,-9.123389159421367e-06
+VehicleType_PHEV,-7.630097124447e-06
+Transmission_CVT,-6.756185441102892e-06
+Vehicle Class_Car,-1.225418307926838e-06
+speed_var,3.3902409164073168e-31
+accel_mean,0.0

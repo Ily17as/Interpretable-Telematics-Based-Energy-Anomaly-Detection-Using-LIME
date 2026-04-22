@@ -1,0 +1,5 @@
+trip_id,method,top_features
+560_141,ManualSHAP,accel_var:-0.0125 | Transmission_CVT:-0.0107 | Generalized_Weight:0.0070 | Transmission_NO DATA:-0.0035 | distance_km:0.0017 | duration_min:0.0002 | idle_time_min:-0.0000 | VehicleType_PHEV:0.0000 | Drive Wheels_FWD:0.0000 | VehicleType_EV:0.0000
+536_340,ManualSHAP,Transmission_CVT:0.0896 | accel_var:0.0221 | Transmission_NO DATA:0.0148 | distance_km:-0.0027 | Generalized_Weight:-0.0013 | duration_min:-0.0002 | idle_time_min:-0.0000 | VehicleType_PHEV:0.0000 | Drive Wheels_FWD:0.0000 | VehicleType_EV:0.0000
+11_3013,ManualSHAP,Transmission_CVT:-0.0137 | Transmission_NO DATA:-0.0033 | Generalized_Weight:-0.0027 | distance_km:-0.0021 | accel_var:-0.0009 | duration_min:-0.0003 | idle_time_min:-0.0001 | VehicleType_PHEV:0.0000 | Drive Wheels_FWD:0.0000 | VehicleType_EV:0.0000
+443_1365,ManualSHAP,accel_var:-0.0151 | Transmission_CVT:-0.0126 | Transmission_NO DATA:-0.0036 | Generalized_Weight:-0.0036 | distance_km:-0.0018 | duration_min:0.0002 | idle_time_min:-0.0000 | VehicleType_PHEV:0.0000 | Drive Wheels_FWD:0.0000 | VehicleType_EV:0.0000

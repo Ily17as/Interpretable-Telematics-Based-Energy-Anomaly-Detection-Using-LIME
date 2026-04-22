@@ -1,78 +1,72 @@
-# VED Energy Baseline: `src/` usage
+# VED Energy Baseline: `src/` Usage
 
-This folder contains the **post-training pipeline** for the VED coursework project:
-- detect anomalous trips using **residuals** (`actual - predicted`)
-- generate **LIME** explanations for selected trips
-- (optional) save basic plots for reporting
+This folder contains reusable code for the VED coursework project:
 
-> **Assumption:** you already ran the notebook and produced:
-> - `regression_model/outputs/residuals.parquet` (trip-level table with features + actual/predicted/residual)
-> - `regression_model/models/xgb_energy_regressor.joblib` (trained XGBoost model)
+- detect anomalous trips using residuals (`actual - predicted`)
+- generate LIME explanations for selected trips
+- run trustworthiness checks for calibration, leakage, stability, and subgroups
+- save basic plots for reporting
 
----
+## Assumptions
 
-## Folder structure
+The baseline notebook has already produced:
 
-```
+- `regression_model/outputs/residuals.parquet` with `trip_id`, actual energy, predictions, and residuals
+- `regression_model/models/xgb_energy_regressor.joblib` or `regression_model/models/xgb_energy_artifact.joblib`
+
+For LIME explanations, use a feature-rich scored trip table. The compact residuals file is enough for anomaly ranking, but not enough to rebuild model inputs.
+
+## Folder Structure
+
+```text
 src/
-  anomaly/        # residual thresholding + anomaly table generation
-  xai/            # LIME (perturbations, kernel weights, weighted ridge surrogate, fidelity)
-  viz/            # helper plots (residual histogram, actual vs predicted, LIME bar)
-  cli/            # runnable scripts (detect anomalies, explain a trip)
-  utils/          # IO helpers + column/config schema
+  anomaly/        residual thresholding and anomaly table generation
+  audit/          calibration, leakage, stability, subgroup checks
+  cli/            runnable scripts
+  modeling/       feature design helpers
+  utils/          I/O helpers, artifact loading, schema definitions
+  viz/            helper plots
+  xai/            LIME perturbation, kernel, surrogate, fidelity logic
 ```
 
----
-
-## Install dependencies
+## Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+## 1. Detect Anomalies
 
-## 1) Detect anomalies (from residuals)
-
-Creates an anomalies table based on a threshold (quantile or MAD-z).
-
-### Quantile threshold (recommended baseline)
+Creates an anomalies table based on a residual threshold.
 
 ```bash
 python -m src.cli.detect_anomalies \
-  --residuals_path outputs/residuals.parquet \
+  --residuals_path regression_model/outputs/residuals.parquet \
   --method quantile --quantile 0.98 \
   --out_anomalies_path outputs/anomalies.parquet \
   --out_meta_path outputs/anomaly_config.json
 ```
 
-Output:
-- `outputs/anomalies.parquet` — anomalous trips (ranked)
-- `outputs/anomaly_config.json` — threshold metadata
+Outputs:
 
-### MAD-z (robust thresholding)
+- `outputs/anomalies.parquet` - anomalous trips, ranked by residual
+- `outputs/anomaly_config.json` - threshold metadata
+
+Robust MAD-z thresholding is also available:
 
 ```bash
 python -m src.cli.detect_anomalies \
-  --residuals_path outputs/residuals.parquet \
+  --residuals_path regression_model/outputs/residuals.parquet \
   --method mad_z --mad_z 3.5 \
   --out_anomalies_path outputs/anomalies.parquet \
   --out_meta_path outputs/anomaly_config.json
 ```
 
----
-
-## 2) Explain a specific trip with LIME
-
-Generates a local explanation around one trip using tabular LIME:
-- perturb samples around the trip
-- query the black-box regressor
-- fit a weighted ridge surrogate
-- save top feature contributions
+## 2. Explain A Trip With LIME
 
 ```bash
 python -m src.cli.explain_trip \
-  --residuals_path outputs/residuals.parquet \
+  --residuals_path path/to/trip_table_scored_with_features.parquet \
   --model_path regression_model/models/xgb_energy_regressor.joblib \
   --trip_id <TRIP_ID> \
   --n_samples 5000 \
@@ -80,33 +74,34 @@ python -m src.cli.explain_trip \
 ```
 
 Outputs:
+
 - `outputs/explanations/trip_<TRIP_ID>_lime.json`
 - `outputs/explanations/trip_<TRIP_ID>_lime_bar.png`
 
-Key fields in the JSON:
-- `top_features`: top local contributions (beta * x0)
+Key JSON fields:
+
+- `top_features`: top local contributions
 - `local_r2`, `local_rmse`: surrogate fidelity near the instance
-- `kernel_width`: kernel width used for proximity weighting
+- `kernel_width`: proximity kernel width used by LIME
 
----
-
-## 3) (Optional) Basic plots for reporting
-
-You can call plotting utilities from a notebook:
+## 3. Basic Plots
 
 ```python
 import pandas as pd
 from src.viz.plots import plot_residual_hist, plot_actual_vs_pred
 
-df = pd.read_parquet("outputs/residuals.parquet")
+df = pd.read_parquet("regression_model/outputs/residuals.parquet")
 plot_residual_hist(df, residual_col="residual", out_path="outputs/residual_hist.png")
-plot_actual_vs_pred(df, y_col="energy_per_km", yhat_col="predicted_energy_per_km", out_path="outputs/actual_vs_pred.png")
+plot_actual_vs_pred(
+    df,
+    y_col="energy_per_km",
+    yhat_col="predicted_energy_per_km",
+    out_path="outputs/actual_vs_pred.png",
+)
 ```
 
----
+## Notes
 
-## Notes / common pitfalls
-
-- **Feature mismatch errors**: ensure `residuals.parquet` includes the same feature columns that were used to train the model.
-- **Categoricals**: the pipeline uses `pandas.get_dummies` (one-hot). If categories differ between splits, always reindex to a shared column set.
-- **LIME stability**: increase `--n_samples` (e.g., 10000) and/or increase ridge regularization if explanations are noisy.
+- Feature mismatch errors usually mean the residual table does not include the same feature columns used for training.
+- The LIME pipeline uses one-hot encoded categoricals; align dummy columns before prediction.
+- If explanations are noisy, increase `--n_samples` or ridge regularization.

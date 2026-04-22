@@ -1,129 +1,84 @@
-# Interpretable Telematics-Based Energy Anomaly Detection with LIME
+# Explaining Vehicle Energy Anomalies in Telematics
 
-## What this repository does
+A tutorial-style case study on detecting unexpectedly energy-inefficient vehicle trips with XGBoost and explaining those alerts with manual SHAP-style attributions and LIME.
 
-This project studies **energy anomaly detection for vehicle trips** and explains suspicious predictions with **LIME**.
+## Project Summary
 
-The core pipeline is:
+The project models expected trip-level `energy_per_km` from telematics features, flags trips with unusually high positive residuals, and explains those alerts with two post-hoc methods:
 
-1. build a trip-level table from the Vehicle Energy Dataset (VED)
-2. train an **XGBoost regressor** to predict expected energy consumption per km
-3. define anomalies as trips with unusually large positive residuals
-4. explain anomalous trips with **local linear surrogates** around each trip
+- **Manual SHAP-style attribution**: a permutation-based Shapley approximation implemented in the explanation notebook, without using the `shap` library.
+- **LIME**: a local surrogate baseline implemented in `src/xai/` and used for comparison.
 
-## Why this version is stronger
+The workflow also includes a trustworthiness audit covering:
 
-The previous repository mixed together two different artifact formats and the explanation CLI could not be reproduced from the files that were committed. This refactored version makes the workflow explicit:
+- leakage-aware modeling
+- validation-only threshold calibration
+- local explanation stability
+- subgroup robustness
 
-- `regression_model/` stores baseline artifacts
-- `LIME_implementation/final_telematics_lime_project.ipynb` is the full research notebook
-- `src/` contains a cleaner, modular pipeline for anomaly detection and explanation
-- `docs/` contains a polished proposal and a baseline report template
-- `tests/` contains small smoke tests for the main mathematical components
+## Main Results
 
-## Research question
+On the shipped baseline test split:
 
-**Can we detect trips with unexpectedly high energy consumption and provide locally faithful, human-readable explanations of which telematics factors made those trips look anomalous?**
+- **MAE:** 0.0670
+- **RMSE:** 0.1332
+- **R2:** 0.5377
+- **Test trips:** 698
+- **Flagged anomalies:** 41
+- **Anomaly rate:** 5.87%
 
-This formulation is stronger than “use LIME on XGBoost” because it defines:
+The audit shows that leakage can substantially inflate apparent performance, LIME fidelity varies by trip, and the `Transmission = NO DATA` subgroup has much higher error and anomaly rate than the CVT subgroup.
 
-- the prediction target
-- the anomaly criterion
-- the explainability objective
-- the evaluation target for the final report
-
-## Repository structure
+## Repository Structure
 
 ```text
-LIME_implementation/
-  final_telematics_lime_project.ipynb   # full end-to-end notebook
-  README_run_xai_project.md
+docs/
+  blogpost_draft.md      Final narrative draft
+  results_tables.md      Final metrics and interpretation tables
+  reproducibility.md     Notebook order and output locations
 
-regression_model/
-  ved-energy-regression.ipynb           # baseline model notebook
-  models/
-  outputs/
+notebooks/
+  05_blogpost_main_flow.ipynb
+  06_shap_vs_lime.ipynb
+  07_trustworthiness_audit.ipynb
+  baseline_implementation/
+    final-telematics-lime.ipynb
+    output.zip           Compact baseline artifact used by final notebooks
 
 src/
-  anomaly/                             # threshold logic
-  cli/                                 # command line entry points
-  modeling/                            # raw-feature to design-matrix helpers
-  utils/                               # I/O and artifact loading
-  viz/                                 # plotting
-  xai/                                 # LIME utilities
+  anomaly/               Residual thresholding and anomaly table generation
+  audit/                 Calibration, leakage, stability, subgroup checks
+  cli/                   Command-line entry points
+  modeling/              Feature design helpers
+  utils/                 I/O, artifact, schema helpers
+  viz/                   Plotting utilities
+  xai/                   LIME perturbation, kernel, surrogate, fidelity code
 
-docs/
-  IMPROVED_PROPOSAL.md
-  BASELINE_REPORT_TEMPLATE.md
-  TA_CHECKLIST.md
+outputs_blogpost/
+  figures/               Main figures
+  tables/                Summary CSVs
+  audit/                 Audit figures and tables
+  xai/                   Manual SHAP-style, LIME, and comparison outputs
 
 tests/
-  test_thresholds.py
-  test_weighted_ridge.py
+  Unit tests for thresholds, LIME surrogate logic, CLI helpers, and audits
 ```
 
-## Important reproducibility note
+## Recommended Notebook Order
 
-There are **two artifact styles** in this repository:
+1. `regression_model/ved-energy-regression.ipynb`
+2. `notebooks/05_blogpost_main_flow.ipynb`
+3. `notebooks/06_shap_vs_lime.ipynb`
+4. `notebooks/07_trustworthiness_audit.ipynb`
 
-1. **baseline regression artifact**
-   - saved in `regression_model/models/xgb_energy_regressor.joblib`
-   - contains a dictionary with the trained model and the design columns
-2. **full XAI artifact**
-   - produced by `LIME_implementation/final_telematics_lime_project.ipynb`
-   - contains raw-feature metadata, preprocessing info, background samples, and model metrics
+## Final Deliverables
 
-For trip-level explanations, the recommended path is the **full XAI artifact**, because LIME needs the raw trip features and a background distribution.
+- [docs/blogpost_draft.md](docs/blogpost_draft.md)
+- [docs/results_tables.md](docs/results_tables.md)
+- [docs/reproducibility.md](docs/reproducibility.md)
+- final figures and tables under `outputs_blogpost/`
+- reusable LIME/anomaly/audit utilities under `src/`
 
-## Installation
+## Interpretation Note
 
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-## Baseline anomaly detection
-
-```bash
-python -m src.cli.detect_anomalies   --residuals_path regression_model/outputs/residuals.parquet   --out_anomalies_path outputs/anomalies.parquet   --out_meta_path outputs/anomaly_config.json
-```
-
-## Trip explanation (recommended workflow)
-
-First run the full notebook and produce:
-
-- `outputs_final/cache/trip_table_scored.csv.gz`
-- `outputs_final/models/xgb_energy_artifact.joblib`
-
-Then explain a trip:
-
-```bash
-python -m src.cli.explain_trip   --scored_table_path outputs_final/cache/trip_table_scored.csv.gz   --artifact_path outputs_final/models/xgb_energy_artifact.joblib   --trip_id 8_706   --out_dir outputs/explanations
-```
-
-## Why the final report should be convincing
-
-A good final submission should clearly separate four questions:
-
-1. **Prediction quality** — how well does XGBoost estimate expected energy consumption?
-2. **Anomaly logic** — why is a residual-based anomaly definition reasonable here?
-3. **Explanation quality** — how locally faithful is the surrogate? (local R², local RMSE)
-4. **Practical usefulness** — do the explanations point to understandable trip factors such as speed variance, idling, distance, acceleration, and vehicle properties?
-
-## Known limitations
-
-- residual-based anomaly detection can confuse true faults with unusual but benign driving conditions
-- LIME explanations are local and can vary with perturbation settings
-- explanations are only as good as the feature engineering used upstream
-- the repository does not ship the full raw VED dataset, so users must recreate the scored trip table from the notebook
-
-## References to cite in the report
-
-1. Ribeiro, Singh, Guestrin. *“Why Should I Trust You?”: Explaining the Predictions of Any Classifier.* KDD 2016.
-2. Oh, LeBlanc, Peng. *Vehicle Energy Dataset (VED), A Large-scale Dataset for Vehicle Energy Consumption Research.* arXiv:1905.02081.
-3. Chen, Guestrin. *XGBoost: A Scalable Tree Boosting System.* KDD 2016.
-
-## License
-
-MIT
+This is a decision-support workflow, not a direct mechanical diagnostic tool. A flagged trip means "unexpected under the model", not "definitely faulty".

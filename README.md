@@ -646,6 +646,8 @@ It allows a user to:
 
 This turns the pipeline into a practical decision-support interface rather than only a notebook-based experiment.
 
+<video controls src="demo.mp4" title="Streamlit demo"></video>
+
 ---
 
 ## 18. Limitations
